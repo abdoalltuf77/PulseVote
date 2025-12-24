@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PulseVote - Real-time Opinion</title>
+    <meta name="theme-color" content="#ffffff">
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="apple-touch-icon" href="icon.png">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href='data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22PulseVote%22%2C%22short_name%22%3A%22PulseVote%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23ffffff%22%2C%22theme_color%22%3A%22%232563EB%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22icon.png%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fpng%22%7D%2C%7B%22src%22%3A%22icon.png%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fpng%22%7D%5D%7D'>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        @font-face {
+            font-family: "CairoBold";
+            src: url("Cairo-Bold.ttf") format("truetype"), url("../ppp/kk/Cairo-Bold.ttf") format("truetype");
+            font-weight: 700;
+            font-style: normal;
+            font-display: swap;
+        }
+        :root {
+            --primary: #2563EB;
+            --primary-dark: #1d4ed8;
+            --primary-light: #eff6ff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --bg-body: #ffffff;
+            --bg-card: #f9fafb;
+            --border: #e5e7eb;
+            --success: #10b981;
+            --danger: #ef4444;
+            --radius: 12px;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --transition: all 0.2s ease;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: var(--font-family); background-color: var(--bg-body); color: var(--text-main); line-height: 1.6; display: flex; flex-direction: column; min-height: 100vh; }
+        
+        /* Layout & Utilities */
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; width: 100%; flex: 1; }
+        .hidden { display: none !important; }
+        .text-center { text-align: center; }
+        .text-muted { color: var(--text-muted); }
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-4 { gap: 1rem; }
+        .mt-4 { margin-top: 1rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .p-4 { padding: 1rem; }
+
+        /* Buttons */
+        .btn { display: inline-flex; align-items: center; justify-content: center; padding: 12px 24px; border-radius: var(--radius); font-weight: 600; cursor: pointer; border: none; transition: var(--transition); font-size: 1rem; width: 100%; }
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-primary:hover { background-color: var(--primary-dark); }
+        .btn-outline { background-color: transparent; border: 2px solid var(--primary); color: var(--primary); }
+        .btn-outline:hover { background-color: var(--primary-light); }
+        .btn-sm { padding: 8px 16px; font-size: 0.875rem; width: auto; }
+
+        /* Forms */
+        .form-group { margin-bottom: 1.25rem; }
+        .form-label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-main); }
+        .form-input, .form-select { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 1rem; }
+        .form-input:focus { outline: none; border-color: var(--primary); }
+
+        /* Cards */
+        .card { background: var(--bg-card); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); border: 1px solid var(--border); margin-bottom: 20px; animation: fadeIn 0.4s ease-out; }
+
+        /* Header */
+        header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.95); position: sticky; top: 0; z-index: 100; }
+        .logo { font-size: 1.5rem; font-weight: 800; color: var(--primary); direction: ltr; unicode-bidi: isolate; }
+        .logo span { color: var(--text-main); }
+
+        /* Poll Elements */
+        .poll-options button { width: 100%; margin-bottom: 10px; text-align: left; }
+        .emoji-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); gap: 10px; }
+        .emoji-btn { background: white; border: 1px solid var(--border); border-radius: var(--radius); font-size: 1.5rem; padding: 10px; cursor: pointer; }
+        .emoji-btn.selected { border-color: var(--primary); background: var(--primary-light); }
+        .star-rating { display: flex; justify-content: center; gap: 5px; }
+        .star-rating label { display: inline-block; font-size: 2rem; line-height: 1; color: #d1d5db; cursor: pointer; font-family: "Segoe UI Symbol", "Apple Color Emoji", "Noto Color Emoji", var(--font-family); }
+        .star-rating label.selected { color: var(--primary); }
+        .star-rating input:checked ~ label { color: var(--primary); }
+
+        /* Results */
+        .result-bar-container { margin-bottom: 15px; }
+        .result-label { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 4px; }
+        .result-track { background: #e5e7eb; height: 12px; border-radius: 6px; overflow: hidden; }
+        .result-fill { height: 100%; background: var(--primary); transition: width 1s ease-out; }
+        .result-fill.after { background: var(--success); position: absolute; top:0; left:0; opacity: 0.7; }
+
+        /* Phase Toggle */
+        .phase-toggle { display: flex; background: #e5e7eb; padding: 4px; border-radius: var(--radius); margin-bottom: 20px; }
+        .phase-btn { flex: 1; text-align: center; padding: 8px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+        .phase-btn.active { background: white; color: var(--primary); }
+
+        /* Toast */
+        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 2000; }
+        .toast { background: var(--text-main); color: white; padding: 12px 20px; border-radius: 8px; margin-top: 10px; animation: slideIn 0.3s; }
+
+        /* Error Box */
+        #error-box { background: #fee2e2; color: #991b1b; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #fecaca; font-family: monospace; white-space: pre-wrap; display: none; }
+
+        /* RTL */
+        html[dir="rtl"] { direction: rtl; }
+        html[dir="rtl"] body { font-family: "CairoBold", var(--font-family); }
+        html[dir="rtl"] .poll-options button { text-align: right; }
+        html[dir="rtl"] #toast-container { right: auto; left: 20px; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo" dir="ltr">Pulse<span>Vote</span></div>
+        <button id="lang-toggle" class="btn btn-outline btn-sm" onclick="window.toggleLang()">عربي</button>
+    </header>
+
+    <!-- Error Reporting -->
+    <div id="error-box"></div>
+
+    <main id="app-container" class="container">
+        <div class="text-center" style="margin-top: 50px;">
+            <p>Loading PulseVote...</p>
+        </div>
+    </main>
+
+    <div id="toast-container"></div>
+
+    <script>
+        // --- Global Error Handling ---
+        window.onerror = function(message, source, lineno, colno, error) {
+            const errBox = document.getElementById('error-box');
+            errBox.style.display = 'block';
+            errBox.innerText = `Error: ${message}\nLine: ${lineno}`;
+            console.error(error);
+            return false;
+        };
+
+        const SUPABASE_URL = 'https://rptdfxzprgbytfkmaand.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_nJJ6wiCxbH1d8WZaGiUX7A_fQfsI5lp';
+        let supabaseClient;
+        try {
+            if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+                throw new Error('Supabase library not loaded');
+            }
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        } catch (e) {
+            console.error(e);
+        }
+
+        const HOME_MEDIA_TYPE = 'image';
+        const HOME_MEDIA_URL = '';
+
+        // --- State Management ---
+        const STATE = {
+            lang: localStorage.getItem('pv_lang') || 'en',
+            poll: null,
+            phase: 'pre',
+            screen: 'home'
+        };
+
+        const I18N = {
+            en: {
+                create: "Create New Poll", vote: "Vote", results: "Results", thanks: "Thank You",
+                q: "Question", type: "Type", yesno: "Yes/No", choice: "Choice", emoji: "Emoji", star: "Stars",
+                add: "Add Option", submit: "Submit Vote", createBtn: "Create Poll",
+                copy: "Copy Link", copied: "Copied!", voteAgain: "Vote Phase 2", before: "Before", after: "After",
+                home: "Home", viewRes: "View Results", votes: "votes",
+                linkPlaceholder: "Paste poll link or ID...", go: "Go",
+                tagline: "Fast opinions. Live results.",
+                haveCode: "Open an existing poll",
+                questionRequired: "Question is required",
+                addAtLeast2: "Add at least 2 options",
+                storageError: "Storage Error",
+                pollNotFound: "Poll not found",
+                copyFailed: "Failed to copy",
+                share: "Share",
+                shareThisLink: "Share this link:",
+                ready: "Ready!",
+                optionPlaceholder: "Option",
+                yes: "Yes",
+                no: "No"
+            },
+            ar: {
+                create: "إنشاء استبيان", vote: "تصويت", results: "النتائج", thanks: "شكراً لك",
+                q: "السؤال", type: "النوع", yesno: "نعم/لا", choice: "خيارات", emoji: "رموز", star: "نجوم",
+                add: "إضافة خيار", submit: "إرسال", createBtn: "إنشاء",
+                copy: "نسخ الرابط", copied: "تم النسخ!", voteAgain: "تصويت المرحلة 2", before: "قبل", after: "بعد",
+                home: "الرئيسية", viewRes: "عرض النتائج", votes: "أصوات",
+                linkPlaceholder: "ألصق رابط الاستبيان أو المعرّف...", go: "اذهب",
+                tagline: "رأي سريع. نتائج مباشرة.",
+                haveCode: "فتح استبيان موجود",
+                questionRequired: "السؤال مطلوب",
+                addAtLeast2: "أضف خيارين على الأقل",
+                storageError: "خطأ في التخزين",
+                pollNotFound: "الاستبيان غير موجود",
+                copyFailed: "فشل النسخ",
+                share: "مشاركة",
+                shareThisLink: "شارك هذا الرابط:",
+                ready: "جاهز!",
+                optionPlaceholder: "خيار",
+                yes: "نعم",
+                no: "لا"
+            }
+        };
+
+        // --- Core Helpers ---
+        function t(key) { return I18N[STATE.lang][key] || key; }
+
+        function getEl(id) { 
+            const el = document.getElementById(id);
+            if(!el) console.error(`Element #${id} not found`);
+            return el; 
+        }
+
+        function showToast(msg) {
+            const container = getEl('toast-container');
+            if(!container) return;
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+
+            toast.textContent = msg;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        function copyToClipboard(text) {
+            // Fallback for file:// protocol where navigator.clipboard is often blocked
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";  // Avoid scrolling to bottom
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showToast(t('copied'));
+            } catch (err) {
+                showToast(t('copyFailed'));
+            }
+            document.body.removeChild(textArea);
+        }
+
+        function displayOption(poll, idx) {
+            if (!poll) return '';
+            if (poll.type === 'yesno') return idx === 0 ? t('yes') : t('no');
+            if (poll.type === 'star') return '\u2605'.repeat(idx + 1);
+            return poll.opts?.[idx] ?? '';
+        }
+
+        function highlightStarSelection(selectedIdx) {
+            const container = document.querySelector('#app-container .star-rating');
+            if (!container) return;
+            const stars = container.querySelectorAll('label[data-idx]');
+            stars.forEach((el) => {
+                const idx = Number(el.getAttribute('data-idx'));
+                if (Number.isFinite(idx) && idx <= selectedIdx) el.classList.add('selected');
+                else el.classList.remove('selected');
+            });
+        }
+
+        function toDbPoll(poll) {
+            return {
+                question: poll.q,
+                type: poll.type,
+                options: poll.opts,
+                votes_pre: poll.votesPre,
+                votes_post: poll.votesPost
+            };
+        }
+
+        function fromDbPoll(row) {
+            return {
+                id: row.id,
+                q: row.question,
+                type: row.type,
+                opts: row.options,
+                votesPre: row.votes_pre,
+                votesPost: row.votes_post
+            };
+        }
+
+        function getShareBaseUrl() {
+            const base = window.location.href.split('?')[0];
+            return base;
+        }
+
+        function parsePollId(input) {
+            const raw = (input || '').trim();
+            if (!raw) return '';
+            try {
+                if (raw.includes('://')) {
+                    const u = new URL(raw);
+                    return u.searchParams.get('id') || '';
+                }
+            } catch (_) {}
+            try {
+                if (raw.includes('?id=')) {
+                    const u = new URL(raw, window.location.origin);
+                    return u.searchParams.get('id') || '';
+                }
+            } catch (_) {}
+            return raw;
+        }
+
+        // --- Functions (Exposed to Window) ---
+
+        window.setLang = (lang) => {
+            STATE.lang = lang;
+            document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+            document.documentElement.lang = lang;
+            getEl('lang-toggle').textContent = lang === 'en' ? 'عربي' : 'English';
+            localStorage.setItem('pv_lang', lang);
+            if (STATE.screen === 'create') window.renderCreate();
+            else if (STATE.screen === 'vote' && STATE.poll) window.renderVote(STATE.poll);
+            else if (STATE.screen === 'thanks' && STATE.poll) window.renderThanks(STATE.poll);
+            else if (STATE.screen === 'results' && STATE.poll) window.renderResults(STATE.poll);
+            else window.renderHome();
+        };
+
+        window.toggleLang = () => window.setLang(STATE.lang === 'en' ? 'ar' : 'en');
+
+        window.renderHome = () => {
+            STATE.screen = 'home';
+            const container = getEl('app-container');
+            if(!container) return;
+            const mediaHtml = HOME_MEDIA_URL
+                ? (HOME_MEDIA_TYPE === 'video'
+                    ? `<div class="mb-4" style="border-radius:12px; overflow:hidden; border:1px solid var(--border); background:white">
+                           <video src="${HOME_MEDIA_URL}" controls style="width:100%; display:block" playsinline></video>
+                       </div>`
+                    : `<div class="mb-4" style="border-radius:12px; overflow:hidden; border:1px solid var(--border); background:white">
+                           <img src="${HOME_MEDIA_URL}" alt="PulseVote" style="width:100%; display:block" />
+                       </div>`)
+                : '';
+            container.innerHTML = `
+                <div class="card text-center">
+                    <h1 class="mb-4" dir="ltr">PulseVote</h1>
+                    <p class="mb-4 text-muted">${t('tagline')}</p>
+                    <button onclick="window.renderCreate()" class="btn btn-primary mb-4">${t('create')}</button>
+                    
+                    <div class="p-4" style="background:white; border-radius:8px; border:1px solid var(--border)">
+                        ${mediaHtml}
+                        <button onclick="window.toggleJoin()" class="btn btn-outline btn-sm">${t('haveCode')}</button>
+                        <div id="join-box" class="hidden" style="margin-top:12px">
+                            <div class="flex gap-2">
+                                <input type="text" id="poll-id-input" class="form-input" placeholder="${t('linkPlaceholder')}">
+                                <button onclick="window.joinPoll()" class="btn btn-primary btn-sm">${t('go')}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+        window.toggleJoin = () => {
+            const box = getEl('join-box');
+            if (!box) return;
+            box.classList.toggle('hidden');
+        };
+
+        window.renderCreate = () => {
+            STATE.screen = 'create';
+            const container = getEl('app-container');
+            container.innerHTML = `
+                <div class="card">
+                    <button onclick="window.renderHome()" class="btn btn-outline btn-sm mb-4">← ${t('home')}</button>
+                    <h2 class="mb-4">${t('create')}</h2>
+                    
+                    <div class="form-group">
+                        <label class="form-label">${t('q')}</label>
+                        <input type="text" id="q-text" class="form-input" placeholder="...">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">${t('type')}</label>
+                        <select id="q-type" class="form-select" onchange="window.toggleOptInput()">
+                            <option value="yesno">${t('yesno')}</option>
+                            <option value="choice">${t('choice')}</option>
+                            <option value="emoji">${t('emoji')}</option>
+                            <option value="star">${t('star')}</option>
+                        </select>
+                    </div>
+
+                    <div id="opt-container" class="form-group hidden">
+                        <label class="form-label">${t('add')}</label>
+                        <div id="opt-list"></div>
+                        <button onclick="window.addOptField()" class="btn btn-outline btn-sm mt-2">+</button>
+                    </div>
+
+                    <button onclick="window.createPoll()" class="btn btn-primary mt-4">${t('createBtn')}</button>
+                </div>
+            `;
+        };
+
+        window.toggleOptInput = () => {
+            const type = getEl('q-type').value;
+            const cont = getEl('opt-container');
+            if (!cont) return;
+            
+            if (['choice', 'emoji'].includes(type)) {
+                cont.classList.remove('hidden');
+                if(getEl('opt-list').children.length === 0) {
+                    window.addOptField();
+                    window.addOptField();
+                }
+            } else {
+                cont.classList.add('hidden');
+            }
+        };
+
+        window.addOptField = () => {
+            const list = getEl('opt-list');
+            const div = document.createElement('div');
+            div.className = 'flex gap-2 mb-2';
+            div.innerHTML = `<input type="text" class="form-input opt-inp" placeholder="${t('optionPlaceholder')}"><button onclick="this.parentElement.remove()" class="btn btn-outline btn-sm text-danger">×</button>`;
+            list.appendChild(div);
+        };
+
+        window.createPoll = async () => {
+            if (!supabaseClient) return showToast('Supabase not ready');
+            const q = getEl('q-text').value;
+            const type = getEl('q-type').value;
+            if(!q) return showToast(t('questionRequired'));
+
+            let opts = [];
+            if(type === 'yesno') opts = ['Yes', 'No'];
+            else if(type === 'star') opts = ['1','2','3','4','5'];
+            else {
+                document.querySelectorAll('.opt-inp').forEach(i => { if(i.value) opts.push(i.value); });
+                if(opts.length < 2) return showToast(t('addAtLeast2'));
+            }
+
+            const poll = { q, type, opts, votesPre: opts.map(()=>0), votesPost: opts.map(()=>0) };
+
+            const { data, error } = await supabaseClient
+                .from('polls')
+                .insert([toDbPoll(poll)])
+                .select('*')
+                .single();
+
+            if (error) return showToast(error.message);
+
+            const created = fromDbPoll(data);
+            STATE.poll = created;
+            const url = getShareBaseUrl() + '?id=' + created.id;
+            
+            getEl('app-container').innerHTML = `
+                <div class="card text-center">
+                    <h2 class="text-success">${t('ready')}</h2>
+                    <p class="mb-2">${t('shareThisLink')}</p>
+                    <input readonly value="${url}" class="form-input mb-4 text-center" onclick="this.select()">
+                    <button onclick="window.copyToClipboard('${url}')" class="btn btn-primary mb-4">${t('copy')}</button>
+                    <div class="flex gap-2">
+                        <button onclick="window.loadPoll('${created.id}')" class="btn btn-outline">${t('viewRes')}</button>
+                        <button onclick="window.renderHome()" class="btn btn-outline">${t('home')}</button>
+                    </div>
+                </div>
+            `;
+        };
+
+        window.joinPoll = () => {
+            const raw = getEl('poll-id-input').value;
+            const id = parsePollId(raw);
+            if(id) window.history.replaceState(null, null, '?id=' + id);
+            window.loadPoll(id);
+        };
+
+        window.loadPoll = async (id) => {
+            if (!supabaseClient) return showToast('Supabase not ready');
+            const { data, error } = await supabaseClient
+                .from('polls')
+                .select('*')
+                .eq('id', id)
+                .single();
+
+            if (error || !data) return showToast(t('pollNotFound'));
+
+            const poll = fromDbPoll(data);
+            STATE.poll = poll;
+            STATE.phase = new URLSearchParams(window.location.search).get('phase') || 'pre';
+            const voted = localStorage.getItem(`pv_v_${poll.id}_${STATE.phase}`);
+
+            if(voted) window.renderResults(poll);
+            else window.renderVote(poll);
+        };
+
+        window.renderVote = (poll) => {
+            STATE.screen = 'vote';
+            let html = '';
+            if(poll.type === 'yesno') {
+                html = `<div class="flex gap-2"><button onclick="window.submit('${poll.id}',0)" class="btn btn-outline">${t('yes')}</button><button onclick="window.submit('${poll.id}',1)" class="btn btn-outline">${t('no')}</button></div>`;
+            } else if(poll.type === 'choice') {
+                html = `<div class="poll-options">`;
+                poll.opts.forEach((o,i) => html += `<button onclick="window.submit('${poll.id}',${i})" class="btn btn-outline">${o}</button>`);
+                html += `</div>`;
+            } else if(poll.type === 'emoji') {
+                html = `<div class="emoji-grid">`;
+                poll.opts.forEach((o,i) => html += `<button onclick="window.submit('${poll.id}',${i})" class="emoji-btn">${o}</button>`);
+                html += `</div>`;
+            } else if(poll.type === 'star') {
+                html = `<div class="star-rating">`;
+                for(let i=0; i<5; i++) html += `<label data-idx="${i}" onmouseover="highlightStarSelection(${i})" onclick="window.submitStar('${poll.id}',${i})">&#9733;</label>`;
+                html += `</div>`;
+            }
+
+            getEl('app-container').innerHTML = `
+                <div class="card text-center">
+                    <span class="badge mb-2">${STATE.phase==='pre'?t('before'):t('after')}</span>
+                    <h2 class="mb-4">${poll.q}</h2>
+                    <div class="mb-4">${html}</div>
+                </div>
+            `;
+        };
+
+        window.submit = async (pid, idx) => {
+            if (!supabaseClient) return showToast('Supabase not ready');
+            const poll = STATE.poll && STATE.poll.id === pid ? STATE.poll : null;
+            if (!poll) return showToast(t('pollNotFound'));
+            const key = `pv_v_${pid}_${STATE.phase}`;
+            
+            if(STATE.phase === 'pre') poll.votesPre[idx]++;
+            else poll.votesPost[idx]++;
+
+            const payload = toDbPoll(poll);
+            const { error } = await supabaseClient
+                .from('polls')
+                .update({ votes_pre: payload.votes_pre, votes_post: payload.votes_post })
+                .eq('id', pid);
+
+            if (error) return showToast(error.message);
+
+            localStorage.setItem(key, '1');
+            
+            window.renderThanks(STATE.poll);
+        };
+
+        window.submitStar = (pid, idx) => {
+            highlightStarSelection(idx);
+            setTimeout(() => window.submit(pid, idx), 150);
+        };
+
+        window.renderThanks = (poll) => {
+            STATE.screen = 'thanks';
+            getEl('app-container').innerHTML = `
+                <div class="card text-center">
+                    <h1 class="mb-4">🎉 ${t('thanks')}</h1>
+                </div>
+            `;
+
+            setTimeout(() => {
+                if (STATE.poll && poll && STATE.poll.id === poll.id) {
+                    window.renderResults(STATE.poll);
+                }
+            }, 2000);
+        };
+
+        window.renderResults = (poll) => {
+            STATE.screen = 'results';
+            const totalPre = poll.votesPre.reduce((a,b)=>a+b,0);
+            const totalPost = poll.votesPost.reduce((a,b)=>a+b,0);
+            const max = Math.max(...poll.votesPre, ...poll.votesPost, 1);
+
+            let bars = poll.opts.map((o, i) => {
+                const label = displayOption(poll, i);
+                const wPre = (poll.votesPre[i]/max)*100;
+                const wPost = (poll.votesPost[i]/max)*100;
+                return `
+                    <div class="result-bar-container">
+                        <div class="result-label"><span>${label}</span> <span>${poll.votesPre[i]} / ${poll.votesPost[i]}</span></div>
+                        <div class="result-track" style="position:relative">
+                            <div class="result-fill" style="width:${wPre}%"></div>
+                            <div class="result-fill after" style="width:${wPost}%"></div>
+                        </div>
+                        <div class="flex gap-2 mt-1" style="font-size:0.7rem"><span style="color:var(--primary)">● ${t('before')}</span><span style="color:var(--success)">● ${t('after')}</span></div>
+                    </div>
+                `;
+            }).join('');
+
+            getEl('app-container').innerHTML = `
+                <div class="card">
+                    <div class="flex justify-between mb-4">
+                        <button onclick="window.renderHome()" class="btn btn-sm btn-outline">${t('home')}</button>
+                        <button onclick="window.copyToClipboard(window.location.href)" class="btn btn-sm btn-outline">🔗 ${t('share')}</button>
+                    </div>
+                    <h2 class="text-center mb-2">${poll.q}</h2>
+                    ${bars}
+                </div>
+            `;
+        };
+
+        // --- Initialization ---
+        window.addEventListener('DOMContentLoaded', () => {
+            try {
+                window.setLang(STATE.lang);
+                const params = new URLSearchParams(window.location.search);
+                if(params.get('id')) window.loadPoll(params.get('id'));
+                else window.renderHome();
+            } catch(e) {
+                console.error(e);
+                getEl('error-box').style.display = 'block';
+                getEl('error-box').innerText = "Init Error: " + e.message;
+            }
+        });
+
+    </script>
+</body>
+</html>
