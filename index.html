@@ -209,6 +209,9 @@
                 close: "Close",
                 shareVia: "Share via",
                 copyLink: "Copy link",
+                export: "Export Results",
+                exportCSV: "Download as CSV",
+                exportSuccess: "Results exported successfully!",
                 ready: "Ready!",
                 optionPlaceholder: "Option",
                 yes: "Yes",
@@ -239,6 +242,9 @@
                 close: "إغلاق",
                 shareVia: "مشاركة عبر",
                 copyLink: "نسخ الرابط",
+                export: "تصدير النتائج",
+                exportCSV: "تحميل كـ CSV",
+                exportSuccess: "تم تصدير النتائج بنجاح!",
                 ready: "جاهز!",
                 optionPlaceholder: "خيار",
                 yes: "نعم",
@@ -282,6 +288,62 @@
             }
             document.body.removeChild(textArea);
         }
+
+        function csvEscape(value) {
+            const s = value === null || value === undefined ? '' : String(value);
+            return '"' + s.replace(/\"/g, '""') + '"';
+        }
+
+        window.exportToCSV = (poll) => {
+            if (!poll) return showToast(t('pollNotFound'));
+
+            const headers = ['Option', 'Phase 1 Votes', 'Phase 2 Votes', 'Total Votes', 'Percentage'];
+            const totalPre = poll.votesPre.reduce((a, b) => a + b, 0);
+            const totalPost = poll.votesPost.reduce((a, b) => a + b, 0);
+            const grandTotal = totalPre + totalPost;
+
+            const lines = [];
+            lines.push([csvEscape('Poll ID'), csvEscape(poll.id)].join(','));
+            lines.push([csvEscape('Poll Question'), csvEscape(poll.q)].join(','));
+            lines.push([csvEscape('Poll Type'), csvEscape(poll.type)].join(','));
+            if (poll.description) lines.push([csvEscape('Description'), csvEscape(poll.description)].join(','));
+            lines.push([csvEscape('Export Date'), csvEscape(new Date().toLocaleString())].join(','));
+            lines.push('');
+            lines.push(headers.map(csvEscape).join(','));
+
+            poll.opts.forEach((_, idx) => {
+                const vPre = poll.votesPre[idx] || 0;
+                const vPost = poll.votesPost[idx] || 0;
+                const total = vPre + vPost;
+                const pct = grandTotal > 0 ? ((total / grandTotal) * 100).toFixed(2) + '%' : '0%';
+                lines.push([
+                    csvEscape(displayOption(poll, idx)),
+                    csvEscape(vPre),
+                    csvEscape(vPost),
+                    csvEscape(total),
+                    csvEscape(pct)
+                ].join(','));
+            });
+
+            lines.push([
+                csvEscape('TOTAL'),
+                csvEscape(totalPre),
+                csvEscape(totalPost),
+                csvEscape(grandTotal),
+                csvEscape('100%')
+            ].join(','));
+
+            const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `poll_${poll.id}_results.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            showToast(t('exportSuccess'));
+        };
 
         window.closeShareModal = () => {
             const host = getEl('share-modal');
@@ -769,7 +831,10 @@
                 <div class="card">
                     <div class="flex justify-between mb-4">
                         <button onclick="window.renderHome()" class="btn btn-sm btn-outline">${t('home')}</button>
-                        <button onclick="window.openShareModal(window.location.href)" class="btn btn-sm btn-outline">🔗 ${t('share')}</button>
+                        <div class="flex gap-2">
+                            <button onclick="window.exportToCSV(STATE.poll)" class="btn btn-sm btn-outline" title="${t('exportCSV')}">📊 ${t('export')}</button>
+                            <button onclick="window.openShareModal(window.location.href)" class="btn btn-sm btn-outline">🔗 ${t('share')}</button>
+                        </div>
                     </div>
                     <h2 class="text-center mb-2">${poll.q}</h2>
                     ${poll.description ? `<p class="text-center text-muted mb-4" style="white-space:pre-wrap">${poll.description}</p>` : ''}
