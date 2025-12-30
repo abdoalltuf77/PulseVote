@@ -1,6 +1,6 @@
 # PulseVote 🗳️
 
-![PulseVote Screenshot](screenshot.png)
+[![PulseVote Screenshot](https://media.githubusercontent.com/media/abdoalltuf77/PulseVote/main/screenshot.png)](https://media.githubusercontent.com/media/abdoalltuf77/PulseVote/main/screenshot.png)
 
 PulseVote is a lightweight web application for creating polls and collecting votes in real time.
 
