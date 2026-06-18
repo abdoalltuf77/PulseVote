@@ -7,8 +7,8 @@ window.onerror = function(message, source, lineno, colno, error) {
     return false;
 };
 
-const SUPABASE_URL = 'https://rptdfxzprgbytfkmaand.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_nJJ6wiCxbH1d8WZaGiUX7A_fQfsI5lp';
+const SUPABASE_URL = 'https://youtgmxqayuthobxpbxb.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvdXRnbXhxYXl1dGhvYnhwYnhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MTEyNTQsImV4cCI6MjA5NzM4NzI1NH0.8SZu9KsLEae6XWfxMeH8ZOvWnfkrKZ9qjtS8fI7xFxo';
 let supabaseClient;
 try {
     if (!window.supabase || typeof window.supabase.createClient !== 'function') {
