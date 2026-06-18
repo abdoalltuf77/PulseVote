@@ -1,7 +1,9 @@
-const CACHE_NAME = 'pulsevote-cache-v2';
+const CACHE_NAME = 'pulsevote-cache-v3';
 const ASSETS = [
   './',
   './index.html',
+  './style.css',
+  './app.js',
   './icon.png',
   './Cairo-Bold.ttf',
   './manifest.webmanifest'
@@ -29,7 +31,6 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(req.url);
 
-  // Cache-first for same-origin assets, network-first for everything else.
   if (url.origin === self.location.origin) {
     event.respondWith(
       caches.match(req).then((cached) => {

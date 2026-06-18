@@ -1,6 +1,7 @@
 {
-  "name": "PulseVote",
+  "name": "Abdulatef Al Ghushaimi - PulseVote",
   "short_name": "PulseVote",
+  "description": "Real-time polling application by Abdulatef Al Ghushaimi",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
